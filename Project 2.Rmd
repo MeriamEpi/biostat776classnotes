@@ -30,6 +30,23 @@ plot(pressure)
 ```{r package install, echo=TRUE}
 install.packages("tidyverse")
 install.packages("tidytuesdayR")
+library(tidyverse)
+library(tidytuesdayR)
 ```
 #Part 1: Fun with functions
 ##Part 1A: Exponential transformation
+```{r 1a, echo=TRUE}
+Exp <- function(x, k) {
+  sum=1
+  while (k>=1){
+    a <- x^(k)/factorial(k)
+    k <- k-1
+    sum = sum + a
+  }
+  print(sum)
+  }
+```
+
+```{r 1b, echo=TRUE}
+
+
