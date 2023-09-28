@@ -37,16 +37,39 @@ library(tidytuesdayR)
 ##Part 1A: Exponential transformation
 ```{r 1a, echo=TRUE}
 Exp <- function(x, k) {
-  sum=1
+  sum <- 1
   while (k>=1){
     a <- x^(k)/factorial(k)
     k <- k-1
-    sum = sum + a
+    sum <- sum + a
   }
   print(sum)
   }
 ```
 
 ```{r 1b, echo=TRUE}
+sample_mean <- function(x) {
+    sum <- 0
+    for (i in seq_along(x)) {
+      sum <- sum + x[i]
+    }
+    mean <- sum/i
+    print(mean)
+}
+
+sample_sd <- function(x) {
+   summ <- 0
+  for (i in seq_along(x)) {
+      summ <- summ + x[i]
+    }
+    mean <- summ/i
+    
+sumsd <- 0
+    for (i in seq_along(x)) {
+      sumsd <- sumsd + (x[i] - mean)^2
+    }
+    sd <- sqrt(sumsd/i)
+    print(sd)
+}
 
 
