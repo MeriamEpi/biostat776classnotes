@@ -9,29 +9,13 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-{## R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
-```
-
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
-
-```{r package install, echo=TRUE}
-install.packages("tidyverse")
-install.packages("tidytuesdayR")
-library(tidyverse)
-library(tidytuesdayR)
+```{r package, include=FALSE}
+packages <- c("callr","cellranger","cli","colorspace","crayon","curl","desc","digest","dplyr","evaluate","fansi","farver","fastmap","forcats","fs","generics","ggh4x","ggplot2","ggrepel","ggtext","glue","gridtext","gtable","here","hms","htmltools","httr","jsonlite","knitr","labeling","lattice","lifecycle","lubridate","magrittr","Matrix","mgcv","munsell","nlme","pillar","pkgbuild","pkgconfig","pkgload","plotrix","prettyunits","processx","ps","purrr","R6","Rcpp","readr","readxl","remotes","rlang","rmarkdown","rprojroot","rstudioapi","rvest","scales","sessioninfo","showtext","showtextdb","stringi","stringr","sysfonts","ThemePark","tibble","tidyr","tidyselect","tidytuesdayR","tidyverse","timechange","tzdb","usethis","utf8","vctrs","whisker","withr","xfun","xml2","yaml")
+installed_packages <- packages %in% rownames(installed.packages())
+if (any(installed_packages == FALSE)) {
+  install.packages(packages[!installed_packages])
+}
+invisible(lapply(packages, library, character.only = TRUE))
 ```
 ## Part 1: Fun with functions
 ```{r 1a, echo=TRUE}
@@ -42,7 +26,7 @@ Exp <- function(x, k) {
     k <- k-1
     sum <- sum + a
   }
-  print(sum)
+  return(sum)
   }
 
 ##### Example 
@@ -58,7 +42,7 @@ sample_mean <- function(x) {
       sum <- sum + x[i]
     }
     mean <- sum/i
-    print(mean)
+    return(mean)
 }
 
 sample_sd <- function(x) {
@@ -73,7 +57,7 @@ sumsd <- 0
       sumsd <- sumsd + (x[i] - mean)^2
     }
     sd <- sqrt(sumsd/i)
-    print(sd)
+    return(sd)
 }
 
 ##### Example
@@ -83,10 +67,10 @@ sample_sd(z)
 ```
 
 ```{r 1c, echo=TRUE}
-calculate_CI <- function(x, conf) {
+calculate_CI <- function(x, conf=0.95) {
   #calculate mean
  summ <- 0
-  for (i in seq_along(x)) {
+    for (i in seq_along(x)) {
       summ <- summ + x[i]
     }
     mean <- summ/i
@@ -97,14 +81,23 @@ calculate_CI <- function(x, conf) {
   #calculate t_score
     t_score <- qt(p = a/2, df = df, lower.tail = FALSE)
   #calculate the standard error
-    SE <- sample_sd(x)/sqrt(i)
+    summ <- 0
+  for (i in seq_along(x)) {
+      summ <- summ + x[i]
+    }
+    mean <- summ/i
+    sumsd <- 0
+    for (i in seq_along(x)) {
+      sumsd <- sumsd + (x[i] - mean)^2
+    }
+    sd <- sqrt(sumsd/i)
+    SE <- sd/sqrt(i)
   #calculate CI
     upper <- mean + t_score * SE
     lower <- mean - t_score * SE
-    CI <- c(lower,upper)
-    print(CI, digits=4)
-    print(paste0('confidence:',conf))
-    print(paste0('df:',df))
+    confi <- conf*100
+    CI <- as.numeric(c(lower,upper))
+    return(CI)
 }
 
 ##### Example
@@ -118,4 +111,77 @@ calculate_CI(ex_list,0.95)
 calculate_CI(ex_list,0.99)
 ```
 ## Part 2: Wrangling data
+```{r load data, echo=TRUE}
+if (!file.exists(here("data", "tuesdata_rainfall.RDS"))) {
+    tuesdata <- tidytuesdayR::tt_load("2020-01-07")
+    rainfall <- tuesdata$rainfall
+    temperature <- tuesdata$temperature
 
+    # save the files to RDS objects
+    saveRDS(tuesdata$rainfall, file = here("data", "tuesdata_rainfall.RDS"))
+    saveRDS(tuesdata$temperature, file = here("data", "tuesdata_temperature.RDS"))
+}
+rainfall <- readRDS(here("data", "tuesdata_rainfall.RDS"))
+temperature <- readRDS(here("data", "tuesdata_temperature.RDS"))
+glimpse(rainfall)
+glimpse(temperature)
+```
+
+```{r 2, echo=TRUE}
+
+rainfall <- drop_na(rainfall)
+
+rainfall <- mutate(rainfall, date = paste(year, month, day, sep="-"))
+rainfall <- select(rainfall, -(month:day))
+rainfall$date <- ymd(rainfall$date)
+is.Date(rainfall$date)
+
+rainfall$city_name <-str_to_upper(rainfall$city_name)
+
+df <- inner_join(temperature, rainfall, by = c("city_name", "date"))
+glimpse(df)
+```
+## Part 3: Visualizing data
+```{r 3a, echo=TRUE, fig.height=6, warning=FALSE}
+ df <- mutate(df, maxtemp = if_else(temp_type=="max", temperature, NA))
+df <- mutate(df, mintemp = if_else(temp_type=="min", temperature, NA))
+plot_3a <- filter(df, date>="2014-01-01") %>% ggplot(aes(x=date, y=temperature)) + geom_smooth(aes(group=temp_type, color=temp_type), se = FALSE) + labs(title="Trends in daily maximum and minimum temperature by city", color="type", subtitle = "Trends in daily minimum and mximum temperatures which have remained flat between 2014 and\n2020 started to rise in 2019. In Sydney and Perth, daily temperature flucations are increasing\nas maximum temperatures rise faster than minimum temperatures.", caption = "Data source: TidyTuesday github 2020") + ylab("temperature (\u00B0C)") + ylim (10, 46) + xlab("date") + theme_minimal() + theme(text=element_text(family="Lato"), panel.background = element_rect(fill="gray98"), plot.background = element_rect(fill="gray98"), axis.text = element_text(color = "grey40"), axis.ticks = element_line(color = "grey91"),  legend.position="bottom", plot.title = element_text(color="grey10", face="bold", hjust=0.5, size=16), plot.subtitle=element_text(hjust=0.5)) + scale_color_manual(values=c("firebrick2", "dodgerblue"))
+plot_3a + facet_wrap(~ city_name, nrow=3, ncol=2)  
+```
+
+```{r 3b, echo=TRUE, warning=FALSE}
+rain_plot <- function(df, city, year) {
+  city <- deparse(substitute(city))
+    plot <- filter(df, city_name==city & year==year) %>%
+    ggplot(aes(log(rainfall))) + geom_histogram(bins=10, color="hotpink1", fill="hotpink1") + theme_minimal() + theme(text=element_text(family="Lato"), panel.background = element_rect(fill="gray98"), plot.background = element_rect(fill="gray98"), axis.text = element_text(color = "grey40"), axis.ticks = element_line(color = "grey91"), plot.title = element_text(color="grey10", face="bold", hjust=0.5, size=14), plot.subtitle=element_text(hjust=0.5)) + labs(title=paste("Distribution of", str_to_title(city), "daily rainfall in millimeters on the log scale,", year), caption="Data source: TidyTuesday github 2020", subtitle=paste("Rainfall in", str_to_title(city), "in", year, "has a left skew, with a heavier tail of drier days"))
+   if(!(city %in% df$city_name)) stop("City name not recognized. Verify city is PERTH, MELBOURNE, SYDNEY, BRISBANE, or CANBERRA")
+  if(!(year %in% df$year)) stop("Year not recognized. Verify year is between 1910-2020")
+}
+
+##### Example
+ex_plot <- rain_plot(df,PERTH,2018)
+
+
+##### Designing this function had three steps. The first was creating the base histogram function, luckily this was already done for us. The only arguments that need to be fed into this function are the data frame and filter criteria since the columns are contained within the data frame. The biggest challenge in designing this function was figuring out how to pass an argument that needs quotations. After piping in the data, the final step was to zhuzh the histogram with color, fonts, and titles and subtitles custom to the inputs.    
+```
+## Part 4: Apply functions and plot
+```{r 4a, echo=TRUE}
+##### Summary statistics by city and year
+df <- rename(df, rainfall_ = rainfall)
+group <- group_by(df, year, city_name)
+  rain_df <- summarize(group, 
+                       mean=sample_mean(rainfall_),
+                       sd=sample_sd(rainfall_), 
+                       lower=first(calculate_CI(rainfall_)), 
+                       upper=last(calculate_CI(rainfall_))
+                       )
+tbl_df(rain_df)
+```
+```{r 4b, echo=TRUE, warning=FALSE}
+plot_4b <- rain_df %>% ggplot(aes(x=year, y=mean)) + geom_errorbar(aes(ymin=lower,ymax=upper), color="#6bb6ff") + geom_line(color="dodgerblue3") + geom_point(color="dodgerblue4") + theme_minimal() + theme(text=element_text(family="Lato"), panel.background = element_rect(fill="gray98"), plot.background = element_rect(fill="gray98"), axis.text = element_text(color = "grey40"), axis.ticks = element_line(color = "grey91"), plot.title = element_text(color="grey10", face="bold", hjust=0.5, size=12), plot.subtitle=element_text(hjust=0.5, size=10), plot.caption=element_text(size=8)) + labs(title="Average millimitres of rainfall from 1910 to 2020 in 5 Australian cities", subtitle = "Year over year mean rainfall has dropped in all 5 cities from 2010 through 2020. In Brisbane and Melbourne it's\nbeen getting drier since the 1960's.", caption = "Data includes available years for each city. Error bars represent standard deviation of mean rainfall. Data source: TidyTuesday github 2020.", ylab="mean rainfall (mm)") + scale_x_continuous(breaks= pretty_breaks())
+plot_4b + facet_wrap(~ city_name, nrow=3, ncol=2, scales="free")  
+```
+
+```{r session info, echo=TRUE}
+sessioninfo::session_info()
+```
